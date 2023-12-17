@@ -11,6 +11,14 @@ class Renderer;
 constexpr int WIDTH = 800;
 constexpr int HEIGHT = 600;
 
+enum class Difficulty {
+    Easy, Medium, Hard
+};
+
+enum class CellState {
+    Hidden, Revealed, Flagged
+};
+
 class Timer {
 private:
     std::chrono::time_point<std::chrono::steady_clock> start_time;
@@ -51,27 +59,57 @@ public:
 class Menu {
 private:
     Game* game;
+    sf::Font font;
+    sf::Text startText;
+    sf::Text difficultyText;
+    Difficulty currentDifficulty;
+    std::vector<std::string> difficultyOptions = {"Easy", "Medium", "Hard"};
 
 public:
-    explicit Menu(Game* game) : game(game) {}
+    explicit Menu(Game* game) : game(game), currentDifficulty(Difficulty::Easy) {
+        // Load the font and initialize the texts as before
+
+        // Set up the difficulty option text
+        difficultyText.setFont(font);
+        difficultyText.setString("Difficulty: Easy");
+        difficultyText.setCharacterSize(24);
+        difficultyText.setFillColor(sf::Color::White);
+        difficultyText.setPosition(WIDTH / 2.f, HEIGHT / 2.f + 60.f);
+    }
 
     void display(sf::RenderWindow& window) {
-        // display the menu on the game window
-        // draw menu
+        // draw the start and exit options
+        window.draw(difficultyText);
     }
 
     void handleInput(const sf::Event& event) {
-        // handle menu input and start the game when required
-        // process user input to navigate through the menu
+        if (event.type == sf::Event::KeyPressed) {
+            switch (event.key.code) {
+                case sf::Keyboard::Up:
+                    changeDifficulty(-1); // Cycle up in difficulty
+                    break;
+                case sf::Keyboard::Down:
+                    changeDifficulty(1); // Cycle down in difficulty
+                    break;
+                case sf::Keyboard::Enter:
+                    game->startGame(currentDifficulty); // Start the game with the current difficulty
+                    break;
+                    // Add other key handling if needed
+            }
+        }
     }
-};
 
-enum class Difficulty {
-    Easy, Medium, Hard
-};
-
-enum class CellState {
-    Hidden, Revealed, Flagged
+    void changeDifficulty(int change) {
+        int difficultyIndex = static_cast<int>(currentDifficulty) + change;
+        // Wrap around the difficulty options
+        if (difficultyIndex >= static_cast<int>(difficultyOptions.size())) {
+            difficultyIndex = 0;
+        } else if (difficultyIndex < 0) {
+            difficultyIndex = difficultyOptions.size() - 1;
+        }
+        currentDifficulty = static_cast<Difficulty>(difficultyIndex);
+        difficultyText.setString("Difficulty: " + difficultyOptions[difficultyIndex]);
+    }
 };
 
 class Cell {
