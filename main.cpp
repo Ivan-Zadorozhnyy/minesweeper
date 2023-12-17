@@ -80,20 +80,32 @@ private:
     bool isMine;
     int adjacentMines;
     sf::Sprite sprite; // SFML sprite for rendering
+    sf::Texture hiddenTexture;
+    sf::Texture mineTexture;
+    sf::Texture flagTexture;
+    std::vector<sf::Texture> numberTextures; // Textures for numbers 1-8
 
 public:
     // Constructor
     Cell() : state(CellState::Hidden), isMine(false), adjacentMines(0) {
         // Load the textures and set the sprite if using sprites.
-        // Ensure you have initialized SFML textures before setting them here.
-        // sprite.setTexture(hiddenTexture); // Placeholder for actual texture
+        hiddenTexture.loadFromFile("path/to/hiddenTexture.png");
+        mineTexture.loadFromFile("path/to/mineTexture.png");
+        flagTexture.loadFromFile("path/to/flagTexture.png");
+        // Load number textures
+        for (int i = 1; i <= 8; ++i) {
+            sf::Texture texture;
+            texture.loadFromFile("path/to/number" + std::to_string(i) + ".png");
+            numberTextures.push_back(texture);
+        }
+        sprite.setTexture(hiddenTexture); // Default to hidden texture
     }
 
     // Reveal the cell
     void reveal() {
         if (state == CellState::Hidden) {
             state = CellState::Revealed;
-            // If the cell is a mine, you will need to trigger additional game-over logic here
+            // If the cell is a mine, additional game-over logic should be triggered outside this class
             updateSprite(); // Update the sprite based on the new state
         }
     }
@@ -102,24 +114,25 @@ public:
     void toggleFlag() {
         if (state == CellState::Hidden) {
             state = CellState::Flagged;
-            updateSprite(); // Update the sprite to show a flag
         } else if (state == CellState::Flagged) {
             state = CellState::Hidden;
-            updateSprite(); // Update the sprite to hide the flag
         }
+        updateSprite(); // Update the sprite to show/hide the flag
     }
 
     // Set the cell as containing a mine
     void setMine(bool mine) {
         isMine = mine;
-        // If setting as mine, make sure adjacentMines is set to 0 or adjust the logic as needed.
+        if (mine) {
+            adjacentMines = 0; // Ensure adjacentMines is set to 0 if it's a mine
+        }
     }
 
     // Increment the count of adjacent mines
     void incrementAdjacentMines() {
         if (!isMine) {
             ++adjacentMines;
-            // Optionally update the sprite to display the number of adjacent mines
+            // No need to update the sprite here since the number is revealed when the cell is revealed
         }
     }
 
@@ -129,26 +142,29 @@ public:
     CellState getState() const { return state; }
     bool isRevealed() const { return state == CellState::Revealed; }
     bool isFlagged() const { return state == CellState::Flagged; }
+    sf::Sprite& getSprite() { return sprite; } // Getter to retrieve the sprite for rendering
 
 private:
     // Update the sprite based on the cell's current state
     void updateSprite() {
-        // Here you will set the appropriate texture based on the cell state.
-        // You will need to load these textures from your resources.
         switch (state) {
             case CellState::Hidden:
-                // sprite.setTexture(hiddenTexture);
+                sprite.setTexture(hiddenTexture);
                 break;
             case CellState::Revealed:
                 if (isMine) {
-                    // sprite.setTexture(mineTexture);
+                    sprite.setTexture(mineTexture);
                 } else {
-                    // sprite.setTexture(numberTexture); // Texture showing the number of adjacent mines
-                    // You'll likely need some logic to select the correct number texture based on adjacentMines.
+                    // Texture showing the number of adjacent mines
+                    if (adjacentMines > 0) { // Only show a number if there are adjacent mines
+                        sprite.setTexture(numberTextures[adjacentMines - 1]);
+                    } else {
+                        // If no adjacent mines, you might have a different texture for empty revealed cells
+                    }
                 }
                 break;
             case CellState::Flagged:
-                // sprite.setTexture(flagTexture);
+                sprite.setTexture(flagTexture);
                 break;
         }
     }
