@@ -344,7 +344,7 @@ class Game {
 private:
     sf::RenderWindow window;
     Timer timer;
-    Board board;
+    Board* board; // Use a pointer to dynamically allocate based on difficulty
     Menu menu;
     Renderer renderer;
     Difficulty difficulty;
@@ -352,11 +352,16 @@ private:
 
 public:
     Game() : window(sf::VideoMode(WIDTH, HEIGHT), "Minesweeper"),
-             board(10, 10, 10), // Placeholder values for board dimensions and mine count
              menu(this),
              renderer(window),
              game_over(false) {
-        // initialization logic for the game state
+        // Placeholder values for board dimensions and mine count
+        // We will initialize the board properly in the startGame function
+        board = new Board(10, 10, 10);
+    }
+
+    ~Game() {
+        delete board; // Clean up dynamically allocated memory
     }
 
     void run() {
@@ -367,10 +372,11 @@ public:
                     window.close();
                 }
 
-                if (!game_over) {
-                    // handle game control input
-                } else {
+                if (game_over) {
                     menu.handleInput(event);
+                } else {
+                    // Handle game control input here. For now, we'll just let the menu handle input.
+                    // Later, you'll add mouse event handling here for cell reveal and flagging.
                 }
             }
 
@@ -381,36 +387,54 @@ public:
 
     void startGame(Difficulty chosenDifficulty) {
         difficulty = chosenDifficulty;
+        // Delete the old board if it exists and create a new one based on the chosen difficulty
+        delete board;
+        board = nullptr;
+        int width, height, mines;
+        switch (difficulty) {
+            case Difficulty::Easy:
+                width = height = 10; mines = 10; break;
+            case Difficulty::Medium:
+                width = height = 14; mines = 40; break;
+            case Difficulty::Hard:
+                width = height = 18; mines = 60; break;
+        }
+        board = new Board(width, height, mines);
         timer.start();
         game_over = false;
-        // Game start logic
+        // Additional game start logic can go here
     }
 
     void endGame(bool won) {
         timer.stop();
         game_over = true;
-        // Game end logic
+        // Display game over logic and handle restart or exit
     }
 
 private:
     void update() {
         if (!game_over) {
-            // update game logic
+            // Update game logic here, like checking win/loss conditions
+            if (board->checkWinCondition()) {
+                endGame(true); // Handle win
+            } else if (board->checkLossCondition()) {
+                endGame(false); // Handle loss
+            }
         }
-        // otherwise, update the menu
+        // Otherwise, update menu or handle other non-gameplay updates
     }
 
     void render() {
         window.clear();
         if (!game_over) {
-            renderer.drawBoard(board);
+            renderer.drawBoard(*board); // Dereference the pointer to pass the board to the renderer
         } else {
             renderer.drawMenu(menu);
         }
         window.display();
     }
 
-    // add any other methods needed for game logic
+    // Other private methods related to game logic can be added here
 };
 
 int main() {
