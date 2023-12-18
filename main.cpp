@@ -132,38 +132,37 @@ private:
     CellState state;
     bool isMine;
     int adjacentMines;
-    sf::Sprite sprite; // SFML sprite for rendering
-    sf::Texture hiddenTexture;
-    sf::Texture mineTexture;
-    sf::Texture flagTexture;
-    std::vector<sf::Texture> numberTextures; // Textures for numbers 1-8
+    sf::Sprite sprite;
+
+    static sf::Texture hiddenTexture;
+    static sf::Texture mineTexture;
+    static sf::Texture flagTexture;
+    static std::vector<sf::Texture> numberTextures;
 
 public:
-    // Constructor
     Cell() : state(CellState::Hidden), isMine(false), adjacentMines(0) {
-        // Load the textures and set the sprite if using sprites.
+        sprite.setTexture(hiddenTexture); // Set the default texture
+    }
+
+    // Static method to load textures (call this method before creating Cell instances)
+    static void loadTextures() {
         hiddenTexture.loadFromFile("path/to/hiddenTexture.png");
         mineTexture.loadFromFile("path/to/mineTexture.png");
         flagTexture.loadFromFile("path/to/flagTexture.png");
-        // Load number textures
-        for (int i = 1; i <= 8; ++i) {
-            sf::Texture texture;
-            texture.loadFromFile("path/to/number" + std::to_string(i) + ".png");
-            numberTextures.push_back(texture);
+        numberTextures.resize(8); // Resize the vector to hold 8 textures
+
+        for (int i = 0; i < 8; ++i) {
+            numberTextures[i].loadFromFile("path/to/number" + std::to_string(i + 1) + ".png");
         }
-        sprite.setTexture(hiddenTexture); // Default to hidden texture
     }
 
-    // Reveal the cell
     void reveal() {
         if (state == CellState::Hidden) {
             state = CellState::Revealed;
-            // If the cell is a mine, additional game-over logic should be triggered outside this class
             updateSprite(); // Update the sprite based on the new state
         }
     }
 
-    // Toggle the flagged state of the cell
     void toggleFlag() {
         if (state == CellState::Hidden) {
             state = CellState::Flagged;
@@ -173,32 +172,29 @@ public:
         updateSprite(); // Update the sprite to show/hide the flag
     }
 
-    // Set the cell as containing a mine
     void setMine(bool mine) {
         isMine = mine;
         if (mine) {
-            adjacentMines = 0; // Ensure adjacentMines is set to 0 if it's a mine
+            adjacentMines = 0; // Reset adjacent mines count if it's a mine
         }
     }
 
-    // Increment the count of adjacent mines
     void incrementAdjacentMines() {
         if (!isMine) {
             ++adjacentMines;
-            // No need to update the sprite here since the number is revealed when the cell is revealed
         }
     }
 
-    // Getters for the cell state and properties
+    // Getters for cell properties
     bool containsMine() const { return isMine; }
     int getAdjacentMines() const { return adjacentMines; }
     CellState getState() const { return state; }
     bool isRevealed() const { return state == CellState::Revealed; }
     bool isFlagged() const { return state == CellState::Flagged; }
-    sf::Sprite& getSprite() { return sprite; } // Getter to retrieve the sprite for rendering
+
+    const sf::Sprite& getSprite() const { return sprite; }
 
 private:
-    // Update the sprite based on the cell's current state
     void updateSprite() {
         switch (state) {
             case CellState::Hidden:
@@ -208,8 +204,7 @@ private:
                 if (isMine) {
                     sprite.setTexture(mineTexture);
                 } else {
-                    // Texture showing the number of adjacent mines
-                    if (adjacentMines > 0) { // Only show a number if there are adjacent mines
+                    if (adjacentMines > 0) {
                         sprite.setTexture(numberTextures[adjacentMines - 1]);
                     } else {
                         // If no adjacent mines, you might have a different texture for empty revealed cells
@@ -223,6 +218,13 @@ private:
     }
 };
 
+// Static texture initialization
+sf::Texture Cell::hiddenTexture;
+sf::Texture Cell::mineTexture;
+sf::Texture Cell::flagTexture;
+std::vector<sf::Texture> Cell::numberTextures;
+
+
 class Board {
 private:
     std::vector<std::vector<Cell>> cells;
@@ -230,6 +232,13 @@ private:
     int height;
     int mineCount;
     bool firstClick;
+
+public:
+    Board(int w, int h, int m) : width(w), height(h), mineCount(m), firstClick(true) {
+        cells.resize(height, std::vector<Cell>(width));
+        // Initialize each cell (assuming Cell class has a method for texture loading)
+        Cell::loadTextures();
+    }
 
     void placeMines(int excludedX, int excludedY) {
         std::random_device rd;
@@ -244,42 +253,27 @@ private:
 
             if ((x != excludedX || y != excludedY) && !cells[y][x].containsMine()) {
                 cells[y][x].setMine(true);
+                incrementAdjacentMines(x, y);
                 minesPlaced++;
             }
         }
     }
 
-    void calculateAdjacentMines() {
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                if (cells[y][x].containsMine()) {
-                    continue;
-                }
-                for (int dy = -1; dy <= 1; dy++) {
-                    for (int dx = -1; dx <= 1; dx++) {
-                        if (dx == 0 && dy == 0) continue;
-                        int nx = x + dx, ny = y + dy;
-                        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                            if (cells[ny][nx].containsMine()) {
-                                cells[y][x].incrementAdjacentMines();
-                            }
-                        }
-                    }
+    void incrementAdjacentMines(int x, int y) {
+        for (int dy = -1; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                if (dx == 0 && dy == 0) continue;
+                int nx = x + dx, ny = y + dy;
+                if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                    cells[ny][nx].incrementAdjacentMines();
                 }
             }
         }
     }
 
-public:
-    Board(int w, int h, int m)
-            : width(w), height(h), mineCount(m), firstClick(true) {
-        cells.resize(height, std::vector<Cell>(width));
-    }
-
     void firstReveal(int x, int y) {
         if (firstClick) {
             placeMines(x, y);
-            calculateAdjacentMines();
             firstClick = false;
         }
         revealCell(x, y);
@@ -293,6 +287,7 @@ public:
             cell.reveal();
 
             if (cell.getAdjacentMines() == 0 && !cell.containsMine()) {
+                // Recursively reveal adjacent cells
                 for (int dy = -1; dy <= 1; dy++) {
                     for (int dx = -1; dx <= 1; dx++) {
                         if (dx == 0 && dy == 0) continue;
@@ -312,7 +307,7 @@ public:
         }
     }
 
-    bool checkWinCondition() {
+    bool checkWinCondition() const {
         for (const auto& row : cells) {
             for (const auto& cell : row) {
                 if (!cell.containsMine() && !cell.isRevealed()) {
@@ -323,7 +318,7 @@ public:
         return true;
     }
 
-    bool checkLossCondition() {
+    bool checkLossCondition() const {
         for (const auto& row : cells) {
             for (const auto& cell : row) {
                 if (cell.containsMine() && cell.isRevealed()) {
@@ -333,35 +328,42 @@ public:
         }
         return false;
     }
+
+    // Method to get the grid of cells for rendering
+    const std::vector<std::vector<Cell>>& getCells() const {
+        return cells;
+    }
 };
 
 class Renderer {
-        private:
-        sf::RenderWindow& window;
+private:
+    sf::RenderWindow& window;
 
-        public:
-        explicit Renderer(sf::RenderWindow& win) : window(win) {}
+public:
+    explicit Renderer(sf::RenderWindow& win) : window(win) {}
 
-        void drawBoard(const Board& board) {
-            // Assuming Board class has a method to get the grid of cells
-            for (const auto& row : board.getCells()) {
-                for (const auto& cell : row) {
-                    // Assuming Cell class has a method to get its sprite
-                    window.draw(cell.getSprite());
-                }
+    void drawBoard(const Board& board) {
+        // Assuming Board class has a method to get the grid of cells
+        const auto& cells = board.getCells();
+        for (const auto& row : cells) {
+            for (const auto& cell : row) {
+                // Assuming Cell class has a method to get its sprite
+                window.draw(cell.getSprite());
             }
         }
+    }
 
-        void drawMenu(const Menu& menu) {
-            // Draw the menu text objects
-            // Assuming Menu class has methods to get the text objects
-            window.draw(menu.getStartText());
-            window.draw(menu.getDifficultyText());
-            // If you have more menu items, draw them here as well
-        }
+    void drawMenu(const Menu& menu) {
+        // Draw the menu text objects
+        // Assuming Menu class has methods to get the text objects
+        window.draw(menu.getStartText());
+        window.draw(menu.getDifficultyText());
+        // If you have more menu items, draw them here as well
+    }
 
-        // You can add additional drawing methods if needed...
+    // You can add additional drawing methods if needed...
 };
+
 
 class Game {
 private:
