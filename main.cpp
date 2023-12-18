@@ -2,6 +2,7 @@
 #include <vector>
 #include <chrono>
 #include <random>
+#include <iostream>
 
 class Game;
 class Cell;
@@ -67,9 +68,20 @@ private:
 
 public:
     explicit Menu(Game* game) : game(game), currentDifficulty(Difficulty::Easy) {
-        // Load the font and initialize the texts as before
+        // Load the font
+        if (!font.loadFromFile("path/to/font.ttf")) {
+            // Handle error, e.g., print an error message or use a default font
+            std::cerr << "Failed to load font." << std::endl;
+        }
 
-        // Set up the difficulty option text
+        // Initialize the start text
+        startText.setFont(font);
+        startText.setString("Start Game");
+        startText.setCharacterSize(24);
+        startText.setFillColor(sf::Color::White);
+        startText.setPosition(WIDTH / 2.f, HEIGHT / 2.f);
+
+        // Initialize the difficulty option text
         difficultyText.setFont(font);
         difficultyText.setString("Difficulty: Easy");
         difficultyText.setCharacterSize(24);
@@ -78,7 +90,7 @@ public:
     }
 
     void display(sf::RenderWindow& window) {
-        // draw the start and exit options
+        window.draw(startText);
         window.draw(difficultyText);
     }
 
@@ -94,7 +106,6 @@ public:
                 case sf::Keyboard::Enter:
                     game->startGame(currentDifficulty); // Start the game with the current difficulty
                     break;
-                    // Add other key handling if needed
             }
         }
     }
@@ -110,6 +121,10 @@ public:
         currentDifficulty = static_cast<Difficulty>(difficultyIndex);
         difficultyText.setString("Difficulty: " + difficultyOptions[difficultyIndex]);
     }
+
+    // Accessor methods for the text objects
+    sf::Text& getStartText() { return startText; }
+    sf::Text& getDifficultyText() { return difficultyText; }
 };
 
 class Cell {
@@ -321,23 +336,31 @@ public:
 };
 
 class Renderer {
-private:
-    sf::RenderWindow& window;
+        private:
+        sf::RenderWindow& window;
 
-public:
-    explicit Renderer(sf::RenderWindow& win) : window(win) {}
+        public:
+        explicit Renderer(sf::RenderWindow& win) : window(win) {}
 
-    void drawBoard(const Board& board) {
-        // draw the game board
-        // loop through the board and draw cells based on their state
-    }
+        void drawBoard(const Board& board) {
+            // Assuming Board class has a method to get the grid of cells
+            for (const auto& row : board.getCells()) {
+                for (const auto& cell : row) {
+                    // Assuming Cell class has a method to get its sprite
+                    window.draw(cell.getSprite());
+                }
+            }
+        }
 
-    void drawMenu(const Menu& menu) {
-        // Draw the menu
-        // menu display logic
-    }
+        void drawMenu(const Menu& menu) {
+            // Draw the menu text objects
+            // Assuming Menu class has methods to get the text objects
+            window.draw(menu.getStartText());
+            window.draw(menu.getDifficultyText());
+            // If you have more menu items, draw them here as well
+        }
 
-    // additional drawing methods...
+        // You can add additional drawing methods if needed...
 };
 
 class Game {
