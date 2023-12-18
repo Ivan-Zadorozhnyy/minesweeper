@@ -369,7 +369,7 @@ class Game {
 private:
     sf::RenderWindow window;
     Timer timer;
-    Board* board; // Use a pointer to dynamically allocate based on difficulty
+    Board* board; // Dynamically allocated based on difficulty
     Menu menu;
     Renderer renderer;
     Difficulty difficulty;
@@ -377,32 +377,22 @@ private:
 
 public:
     Game() : window(sf::VideoMode(WIDTH, HEIGHT), "Minesweeper"),
+             board(nullptr), // Initialize as nullptr
              menu(this),
              renderer(window),
-             game_over(false) {
-        // Placeholder values for board dimensions and mine count
-        // We will initialize the board properly in the startGame function
-        board = new Board(10, 10, 10);
+             game_over(true) { // Start with the menu displayed
+        Cell::loadTextures(); // Load textures for cells
     }
 
     ~Game() {
-        delete board; // Clean up dynamically allocated memory
+        delete board; // Clean up board memory
     }
 
     void run() {
         while (window.isOpen()) {
             sf::Event event;
             while (window.pollEvent(event)) {
-                if (event.type == sf::Event::Closed) {
-                    window.close();
-                }
-
-                if (game_over) {
-                    menu.handleInput(event);
-                } else {
-                    // Handle game control input here. For now, we'll just let the menu handle input.
-                    // Later, you'll add mouse event handling here for cell reveal and flagging.
-                }
+                handleEvent(event);
             }
 
             update();
@@ -410,56 +400,85 @@ public:
         }
     }
 
+    void handleEvent(const sf::Event& event) {
+        if (event.type == sf::Event::Closed) {
+            window.close();
+        }
+
+        if (game_over) {
+            menu.handleInput(event);
+        } else {
+            // Handle game interactions here (mouse events)
+            if (event.type == sf::Event::MouseButtonPressed) {
+                handleMouseInput(event.mouseButton);
+            }
+        }
+    }
+
+    void handleMouseInput(const sf::Event::MouseButtonEvent& mouseEvent) {
+        // Example: Convert mouse position to board coordinates and reveal or flag the cell
+        if (mouseEvent.button == sf::Mouse::Left) {
+            // Left click: reveal cell
+            // Convert mouse position to board coordinates (you'll need to implement this)
+            int x, y;
+            std::tie(x, y) = convertToBoardCoordinates(mouseEvent.x, mouseEvent.y);
+            board->revealCell(x, y);
+        } else if (mouseEvent.button == sf::Mouse::Right) {
+            // Right click: flag cell
+            int x, y;
+            std::tie(x, y) = convertToBoardCoordinates(mouseEvent.x, mouseEvent.y);
+            board->flagCell(x, y);
+        }
+    }
+
+    std::pair<int, int> convertToBoardCoordinates(int mouseX, int mouseY) {
+        // Convert mouse coordinates to board cell indices
+        // This depends on your cell size and board layout
+        int x = mouseX / cellWidth;  // cellWidth to be defined based on your cell size
+        int y = mouseY / cellHeight; // cellHeight to be defined
+        return {x, y};
+    }
+
     void startGame(Difficulty chosenDifficulty) {
         difficulty = chosenDifficulty;
-        // Delete the old board if it exists and create a new one based on the chosen difficulty
-        delete board;
-        board = nullptr;
+        delete board; // Delete the old board if it exists
+        // Create a new board based on the chosen difficulty
         int width, height, mines;
-        switch (difficulty) {
-            case Difficulty::Easy:
-                width = height = 10; mines = 10; break;
-            case Difficulty::Medium:
-                width = height = 14; mines = 40; break;
-            case Difficulty::Hard:
-                width = height = 18; mines = 60; break;
-        }
+        // Define width, height, and mines based on difficulty...
         board = new Board(width, height, mines);
         timer.start();
         game_over = false;
-        // Additional game start logic can go here
     }
 
     void endGame(bool won) {
         timer.stop();
         game_over = true;
-        // Display game over logic and handle restart or exit
+        // Handle game end scenario (display message, etc.)
     }
 
 private:
     void update() {
         if (!game_over) {
-            // Update game logic here, like checking win/loss conditions
             if (board->checkWinCondition()) {
-                endGame(true); // Handle win
+                endGame(true);
             } else if (board->checkLossCondition()) {
-                endGame(false); // Handle loss
+                endGame(false);
             }
+            // Update other game logic if necessary
         }
-        // Otherwise, update menu or handle other non-gameplay updates
     }
 
     void render() {
         window.clear();
         if (!game_over) {
-            renderer.drawBoard(*board); // Dereference the pointer to pass the board to the renderer
+            renderer.drawBoard(*board);
         } else {
             renderer.drawMenu(menu);
         }
         window.display();
     }
 
-    // Other private methods related to game logic can be added here
+    // Other private methods...
 };
 
 int main() {
