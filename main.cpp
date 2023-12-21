@@ -253,7 +253,7 @@ private:
 
 public:
     explicit Renderer(sf::RenderWindow& win) : window(win) {
-        if (!uiFont.loadFromFile("Lato-Black.ttf")) {
+        if (!uiFont.loadFromFile("font/Lato-Black.ttf")) {
             std::cerr << "Failed to load UI font." << std::endl;
         }
         initializeUIText();
@@ -261,13 +261,13 @@ public:
     }
 
     static void loadTextures() {
-        if (!hiddenTexture.loadFromFile("Cell.png")) std::cerr << "Failed to load Cell texture" << std::endl;
-        if (!mineTexture.loadFromFile("Bomb.png")) std::cerr << "Failed to load Bomb texture" << std::endl;
-        if (!flagTexture.loadFromFile("Flag.png")) std::cerr << "Failed to load Flag texture" << std::endl;
+        if (!hiddenTexture.loadFromFile("sprites/Cell.png")) std::cerr << "Failed to load Cell texture" << std::endl;
+        if (!mineTexture.loadFromFile("sprites/Bomb.png")) std::cerr << "Failed to load Bomb texture" << std::endl;
+        if (!flagTexture.loadFromFile("sprites/Flag.png")) std::cerr << "Failed to load Flag texture" << std::endl;
 
         numberTextures.resize(8);
         for (int i = 0; i < 8; ++i) {
-            if (!numberTextures[i].loadFromFile("number" + std::to_string(i + 1) + ".png"))
+            if (!numberTextures[i].loadFromFile("sprites/number" + std::to_string(i + 1) + ".png"))
                 std::cerr << "Failed to load number texture: " << i + 1 << std::endl;
         }
     }
@@ -297,8 +297,7 @@ public:
             for (size_t x = 0; x < cells[y].size(); ++x) {
                 sf::Sprite sprite;
                 sprite.setPosition(x * cellWidth, y * cellHeight);
-                sprite.setScale(static_cast<float>(cellWidth) / hiddenTexture.getSize().x,
-                                static_cast<float>(cellHeight) / hiddenTexture.getSize().y);
+                sprite.setScale(cellWidth / hiddenTexture.getSize().x, cellHeight / hiddenTexture.getSize().y);
 
                 switch(cells[y][x].getState()) {
                     case CellState::Hidden:
@@ -380,11 +379,9 @@ private:
     Renderer renderer;
     Difficulty difficulty;
     bool game_over;
-
     int CELL_WIDTH;
     int CELL_HEIGHT;
     static constexpr int UI_HEIGHT = 100; // Space for UI elements like timer and flag count
-
     int flagCount;
     float elapsedTime;
 
@@ -448,7 +445,7 @@ public:
 
     std::pair<int, int> convertToBoardCoordinates(int mouseX, int mouseY) {
         int x = mouseX / CELL_WIDTH;
-        int y = (mouseY - UI_HEIGHT) / CELL_HEIGHT;
+        int y = mouseY / CELL_HEIGHT;
         return {x, y};
     }
 
@@ -475,6 +472,7 @@ public:
                 break;
         }
 
+        // Adjust cell size based on the difficulty to fit the screen
         CELL_WIDTH = WIDTH / width;
         CELL_HEIGHT = (HEIGHT - UI_HEIGHT) / height;
 
@@ -497,7 +495,6 @@ public:
         }
     }
 
-private:
     void update() {
         if (!game_over) {
             elapsedTime = timer.getElapsedTime();
