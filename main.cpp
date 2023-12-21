@@ -276,12 +276,12 @@ public:
         flagCounterText.setFont(uiFont);
         flagCounterText.setCharacterSize(24);
         flagCounterText.setFillColor(sf::Color::White);
-        flagCounterText.setPosition(10, window.getSize().y - 50); // Adjusted for bottom
+        flagCounterText.setPosition(10, window.getSize().y - 50);
 
         timerText.setFont(uiFont);
         timerText.setCharacterSize(24);
         timerText.setFillColor(sf::Color::White);
-        timerText.setPosition(window.getSize().x - 110, window.getSize().y - 50); // Adjusted for bottom
+        timerText.setPosition(window.getSize().x - 110, window.getSize().y - 50);
 
         endGameText.setFont(uiFont);
         endGameText.setCharacterSize(30);
@@ -311,9 +311,9 @@ public:
                             if(adjacentMines > 0) {
                                 sprite.setTexture(numberTextures[adjacentMines - 1]);
                             } else {
-                                sprite.setTextureRect(sf::IntRect(0, 0, 1, 1)); // Empty cell
+                                sprite.setTextureRect(sf::IntRect(0, 0, 1, 1));
                                 sprite.setColor(sf::Color::White);
-                                sprite.setScale(cellWidth, cellHeight); // Fill cell
+                                sprite.setScale(cellWidth, cellHeight);
                             }
                         }
                         break;
@@ -340,7 +340,7 @@ public:
         endGameText.setString(message);
         endGameText.setPosition(window.getSize().x / 2.f - endGameText.getGlobalBounds().width / 2,
                                 window.getSize().y / 2.f - endGameText.getGlobalBounds().height / 2 - 50);
-        window.draw(endGameText); // Draw immediately to display the message
+        window.draw(endGameText);
     }
 
     void drawUI(int mineCount, int flags, float time) {
@@ -378,7 +378,7 @@ private:
     bool game_over;
     int CELL_WIDTH;
     int CELL_HEIGHT;
-    static constexpr int UI_HEIGHT = 100; // Space for UI elements like timer and flag count
+    static constexpr int UI_HEIGHT = 100;
     int flagCount;
     float elapsedTime;
 
@@ -386,7 +386,7 @@ public:
     Game() : window(sf::VideoMode(WIDTH, HEIGHT), "Minesweeper", sf::Style::Close),
              board(nullptr), menu(this), renderer(window), game_over(true),
              flagCount(0), elapsedTime(0) {
-        window.setFramerateLimit(60); // Limit the framerate to 60 frames per second
+        window.setFramerateLimit(60);
     }
 
     ~Game() {
@@ -470,7 +470,6 @@ public:
                 break;
         }
 
-        // Adjust cell size based on the difficulty to fit the screen
         CELL_WIDTH = WIDTH / width;
         CELL_HEIGHT = (HEIGHT - UI_HEIGHT) / height;
 
@@ -528,7 +527,7 @@ Menu::Menu(Game *game) : game(game), currentDifficulty(Difficulty::Easy) {
     startText.setPosition(WIDTH / 2.f, HEIGHT / 2.f);
 
     difficultyText.setFont(font);
-    difficultyText.setString("Difficulty: Easy"); // Default difficulty
+    difficultyText.setString("Difficulty: Easy");
     difficultyText.setCharacterSize(24);
     difficultyText.setFillColor(sf::Color::White);
     difficultyText.setPosition(WIDTH / 2.f, HEIGHT / 2.f + 60.f);
@@ -568,7 +567,6 @@ const sf::Text &Menu::getStartText() const {
 const sf::Text &Menu::getDifficultyText() const {
     return difficultyText;
 }
-
 
 int main() {
     Game minesweeper;
