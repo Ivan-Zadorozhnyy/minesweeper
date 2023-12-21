@@ -113,6 +113,13 @@ public:
         cells.resize(height, std::vector<Cell>(width));
     }
 
+    int getWidth() const { return width; }
+    int getHeight() const { return height; }
+
+    bool isFirstClick() const {
+        return firstClick;
+    }
+
     void placeMines(int excludedX, int excludedY) {
         std::random_device rd;
         std::mt19937 gen(rd());
@@ -246,65 +253,69 @@ private:
 
 public:
     explicit Renderer(sf::RenderWindow& win) : window(win) {
-        loadTextures();
-        if (!uiFont.loadFromFile("font/Lato-Black.ttf")) {
+        if (!uiFont.loadFromFile("Lato-Black.ttf")) {
             std::cerr << "Failed to load UI font." << std::endl;
         }
         initializeUIText();
+        loadTextures();
     }
 
     static void loadTextures() {
-        hiddenTexture.loadFromFile("sprites/Cell.png");
-        mineTexture.loadFromFile("sprites/Bomb.png");
-        flagTexture.loadFromFile("sprites/Flag.png");
+        if (!hiddenTexture.loadFromFile("Cell.png")) std::cerr << "Failed to load Cell texture" << std::endl;
+        if (!mineTexture.loadFromFile("Bomb.png")) std::cerr << "Failed to load Bomb texture" << std::endl;
+        if (!flagTexture.loadFromFile("Flag.png")) std::cerr << "Failed to load Flag texture" << std::endl;
+
         numberTextures.resize(8);
         for (int i = 0; i < 8; ++i) {
-            numberTextures[i].loadFromFile("sprites/number" + std::to_string(i + 1) + ".png");
+            if (!numberTextures[i].loadFromFile("number" + std::to_string(i + 1) + ".png"))
+                std::cerr << "Failed to load number texture: " << i + 1 << std::endl;
         }
     }
 
     void initializeUIText() {
-        // Initialize Flag Counter Text
         flagCounterText.setFont(uiFont);
         flagCounterText.setCharacterSize(24);
         flagCounterText.setFillColor(sf::Color::White);
-        flagCounterText.setPosition(10, 10); // Placeholder position
+        flagCounterText.setPosition(10, window.getSize().y - 50); // Adjusted for bottom
 
-        // Initialize Timer Text
         timerText.setFont(uiFont);
         timerText.setCharacterSize(24);
         timerText.setFillColor(sf::Color::White);
-        timerText.setPosition(10, 40); // Placeholder position
+        timerText.setPosition(window.getSize().x - 110, window.getSize().y - 50); // Adjusted for bottom
 
-        // Initialize End Game Message Text
         endGameText.setFont(uiFont);
-        endGameText.setCharacterSize(24);
-        endGameText.setFillColor(sf::Color::White);
-        endGameText.setPosition(200, 200); // Placeholder position
+        endGameText.setCharacterSize(30);
+        endGameText.setFillColor(sf::Color::Red);
+        endGameText.setPosition(window.getSize().x / 2.f - endGameText.getGlobalBounds().width / 2,
+                                window.getSize().y / 2.f - endGameText.getGlobalBounds().height / 2);
     }
 
     void drawBoard(const Board& board) {
         const auto& cells = board.getCells();
-        for (size_t i = 0; i < cells.size(); ++i) {
-            for (size_t j = 0; j < cells[i].size(); ++j) {
-                sf::Sprite sprite;
-                sprite.setPosition(i * 30, j * 30); // Assuming cell size is 30x30
+        float cellWidth = window.getSize().x / static_cast<float>(board.getWidth());
+        float cellHeight = (window.getSize().y - 100) / static_cast<float>(board.getHeight());
 
-                switch(cells[i][j].getState()) {
+        for (size_t y = 0; y < cells.size(); ++y) {
+            for (size_t x = 0; x < cells[y].size(); ++x) {
+                sf::Sprite sprite;
+                sprite.setPosition(x * cellWidth, y * cellHeight);
+                sprite.setScale(cellWidth / hiddenTexture.getSize().x, cellHeight / hiddenTexture.getSize().y);
+
+                switch(cells[y][x].getState()) {
                     case CellState::Hidden:
                         sprite.setTexture(hiddenTexture);
                         break;
                     case CellState::Revealed:
-                        if(cells[i][j].containsMine()) {
+                        if(cells[y][x].containsMine()) {
                             sprite.setTexture(mineTexture);
                         } else {
-                            int adjacentMines = cells[i][j].getAdjacentMines();
+                            int adjacentMines = cells[y][x].getAdjacentMines();
                             if(adjacentMines > 0) {
                                 sprite.setTexture(numberTextures[adjacentMines - 1]);
                             } else {
                                 sprite.setTextureRect(sf::IntRect(0, 0, 1, 1)); // Empty cell
                                 sprite.setColor(sf::Color::White);
-                                sprite.setScale(30, 30);
+                                sprite.setScale(cellWidth, cellHeight); // Fill cell
                             }
                         }
                         break;
@@ -317,7 +328,7 @@ public:
         }
     }
 
-    void drawMenu(Menu menu) {
+    void drawMenu(const Menu& menu) {
         window.draw(menu.getStartText());
         window.draw(menu.getDifficultyText());
     }
@@ -332,12 +343,25 @@ public:
 
     void setEndGameMessage(const std::string& message) {
         endGameText.setString(message);
+        window.draw(endGameText); // Draw immediately to display the message
     }
 
-    void drawUI() {
+    void drawUI(int flags, float time) {
+        updateFlagCounter(flags);
+        updateTimer(time);
         window.draw(flagCounterText);
         window.draw(timerText);
-        window.draw(endGameText);
+        // Do not draw endGameText here as it should be drawn only when the game ends
+    }
+
+    void drawEndGameMessage() {
+        if (!endGameText.getString().isEmpty()) {
+            endGameText.setPosition(
+                    (window.getSize().x - endGameText.getLocalBounds().width) / 2.f,
+                    (window.getSize().y - endGameText.getLocalBounds().height) / 2.f
+            );
+            window.draw(endGameText);
+        }
     }
 };
 
@@ -346,6 +370,7 @@ sf::Texture Renderer::hiddenTexture;
 sf::Texture Renderer::mineTexture;
 sf::Texture Renderer::flagTexture;
 std::vector<sf::Texture> Renderer::numberTextures;
+
 
 class Game {
 private:
@@ -357,17 +382,19 @@ private:
     Difficulty difficulty;
     bool game_over;
 
-    static constexpr int CELL_WIDTH = 16;
-    static constexpr int CELL_HEIGHT = 16;
+    static constexpr int CELL_WIDTH = 30; // Adjusted to better fill the screen
+    static constexpr int CELL_HEIGHT = 30; // Adjusted to better fill the screen
     static constexpr int UI_HEIGHT = 100; // Space for UI elements like timer and flag count
 
     int flagCount;
     float elapsedTime;
 
 public:
-    Game() : window(sf::VideoMode(WIDTH, HEIGHT), "Minesweeper"),
+    Game() : window(sf::VideoMode::getDesktopMode(), "Minesweeper", sf::Style::Fullscreen),
              board(nullptr), menu(this), renderer(window), game_over(true),
-             flagCount(0), elapsedTime(0) {}
+             flagCount(0), elapsedTime(0) {
+        window.setFramerateLimit(60); // Limit the framerate to 60 frames per second
+    }
 
     ~Game() {
         delete board;
@@ -401,25 +428,28 @@ public:
         int x, y;
         std::tie(x, y) = convertToBoardCoordinates(mouseEvent.x, mouseEvent.y);
 
-        if (mouseEvent.button == sf::Mouse::Left) {
+        if (mouseEvent.button == sf::Mouse::Left && board->isFirstClick()) {
+            board->firstReveal(x, y);
+            updateFlagCount();
+        } else if (mouseEvent.button == sf::Mouse::Left) {
             board->revealCell(x, y);
-            checkGameState();
+            updateFlagCount();
         } else if (mouseEvent.button == sf::Mouse::Right) {
             board->flagCell(x, y);
             updateFlagCount();
         }
+        checkGameState();
     }
 
     void updateFlagCount() {
         if (board) {
             flagCount = board->countFlaggedCells();
-            renderer.updateFlagCounter(flagCount);
         }
     }
 
     std::pair<int, int> convertToBoardCoordinates(int mouseX, int mouseY) {
         int x = mouseX / CELL_WIDTH;
-        int y = mouseY / CELL_HEIGHT;
+        int y = (mouseY - UI_HEIGHT) / CELL_HEIGHT; // Adjust y coordinate for UI_HEIGHT
         return {x, y};
     }
 
@@ -445,7 +475,7 @@ public:
                 width = 24; height = 20; mines = 99;
                 break;
         }
-        window.setSize(sf::Vector2u(width * CELL_WIDTH, height * CELL_HEIGHT + UI_HEIGHT));
+        window.setSize(sf::Vector2u(width * CELL_WIDTH, (height * CELL_HEIGHT) + UI_HEIGHT));
         delete board;
         board = new Board(width, height, mines);
     }
@@ -454,12 +484,14 @@ public:
         timer.stop();
         game_over = true;
         renderer.setEndGameMessage(won ? "You Won!" : "Game Over");
+        // Draw the end game message immediately
+        renderer.drawEndGameMessage();
     }
 
     void checkGameState() {
-        if (board->checkWinCondition()) {
+        if (board && board->checkWinCondition()) {
             endGame(true);
-        } else if (board->checkLossCondition()) {
+        } else if (board && board->checkLossCondition()) {
             endGame(false);
         }
     }
@@ -468,7 +500,6 @@ private:
     void update() {
         if (!game_over) {
             elapsedTime = timer.getElapsedTime();
-            renderer.updateTimer(elapsedTime);
         }
     }
 
@@ -479,7 +510,10 @@ private:
         } else {
             renderer.drawMenu(menu);
         }
-        renderer.drawUI();
+        renderer.drawUI(flagCount, elapsedTime); // Pass flags and time
+        if (game_over) {
+            renderer.drawEndGameMessage(); // Call this method to draw the message
+        }
         window.display();
     }
 };
