@@ -290,16 +290,15 @@ public:
                                 window.getSize().y / 2.f - endGameText.getGlobalBounds().height / 2);
     }
 
-    void drawBoard(const Board& board) {
+    void drawBoard(const Board& board, int cellWidth, int cellHeight) {
         const auto& cells = board.getCells();
-        float cellWidth = window.getSize().x / static_cast<float>(board.getWidth());
-        float cellHeight = (window.getSize().y - 100) / static_cast<float>(board.getHeight());
 
         for (size_t y = 0; y < cells.size(); ++y) {
             for (size_t x = 0; x < cells[y].size(); ++x) {
                 sf::Sprite sprite;
                 sprite.setPosition(x * cellWidth, y * cellHeight);
-                sprite.setScale(cellWidth / hiddenTexture.getSize().x, cellHeight / hiddenTexture.getSize().y);
+                sprite.setScale(static_cast<float>(cellWidth) / hiddenTexture.getSize().x,
+                                static_cast<float>(cellHeight) / hiddenTexture.getSize().y);
 
                 switch(cells[y][x].getState()) {
                     case CellState::Hidden:
@@ -343,6 +342,8 @@ public:
 
     void setEndGameMessage(const std::string& message) {
         endGameText.setString(message);
+        endGameText.setPosition(window.getSize().x / 2.f - endGameText.getGlobalBounds().width / 2,
+                                window.getSize().y / 2.f - endGameText.getGlobalBounds().height / 2);
         window.draw(endGameText); // Draw immediately to display the message
     }
 
@@ -351,7 +352,6 @@ public:
         updateTimer(time);
         window.draw(flagCounterText);
         window.draw(timerText);
-        // Do not draw endGameText here as it should be drawn only when the game ends
     }
 
     void drawEndGameMessage() {
@@ -371,7 +371,6 @@ sf::Texture Renderer::mineTexture;
 sf::Texture Renderer::flagTexture;
 std::vector<sf::Texture> Renderer::numberTextures;
 
-
 class Game {
 private:
     sf::RenderWindow window;
@@ -382,8 +381,8 @@ private:
     Difficulty difficulty;
     bool game_over;
 
-    static constexpr int CELL_WIDTH = 30; // Adjusted to better fill the screen
-    static constexpr int CELL_HEIGHT = 30; // Adjusted to better fill the screen
+    int CELL_WIDTH;
+    int CELL_HEIGHT;
     static constexpr int UI_HEIGHT = 100; // Space for UI elements like timer and flag count
 
     int flagCount;
@@ -449,7 +448,7 @@ public:
 
     std::pair<int, int> convertToBoardCoordinates(int mouseX, int mouseY) {
         int x = mouseX / CELL_WIDTH;
-        int y = (mouseY - UI_HEIGHT) / CELL_HEIGHT; // Adjust y coordinate for UI_HEIGHT
+        int y = (mouseY - UI_HEIGHT) / CELL_HEIGHT;
         return {x, y};
     }
 
@@ -475,7 +474,10 @@ public:
                 width = 24; height = 20; mines = 99;
                 break;
         }
-        window.setSize(sf::Vector2u(width * CELL_WIDTH, (height * CELL_HEIGHT) + UI_HEIGHT));
+
+        CELL_WIDTH = WIDTH / width;
+        CELL_HEIGHT = (HEIGHT - UI_HEIGHT) / height;
+
         delete board;
         board = new Board(width, height, mines);
     }
@@ -484,7 +486,6 @@ public:
         timer.stop();
         game_over = true;
         renderer.setEndGameMessage(won ? "You Won!" : "Game Over");
-        // Draw the end game message immediately
         renderer.drawEndGameMessage();
     }
 
@@ -506,13 +507,13 @@ private:
     void render() {
         window.clear();
         if (!game_over && board) {
-            renderer.drawBoard(*board);
+            renderer.drawBoard(*board, CELL_WIDTH, CELL_HEIGHT);
         } else {
             renderer.drawMenu(menu);
         }
-        renderer.drawUI(flagCount, elapsedTime); // Pass flags and time
+        renderer.drawUI(flagCount, elapsedTime);
         if (game_over) {
-            renderer.drawEndGameMessage(); // Call this method to draw the message
+            renderer.drawEndGameMessage();
         }
         window.display();
     }
