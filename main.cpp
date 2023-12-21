@@ -8,8 +8,8 @@ class Game;
 class Menu;
 class Renderer;
 
-constexpr int WIDTH = 800;
-constexpr int HEIGHT = 600;
+constexpr int WIDTH = 1920;
+constexpr int HEIGHT = 1080;
 
 enum class Difficulty {
     Easy, Medium, Hard
@@ -390,7 +390,7 @@ private:
     float elapsedTime;
 
 public:
-    Game() : window(sf::VideoMode::getDesktopMode(), "Minesweeper", sf::Style::Fullscreen),
+    Game() : window(sf::VideoMode(WIDTH, HEIGHT), "Minesweeper", sf::Style::Close),
              board(nullptr), menu(this), renderer(window), game_over(true),
              flagCount(0), elapsedTime(0) {
         window.setFramerateLimit(60); // Limit the framerate to 60 frames per second
