@@ -5,8 +5,7 @@
 #include <iostream>
 
 class Game;
-class Cell;
-class Board;
+class Menu;
 class Renderer;
 
 constexpr int WIDTH = 800;
@@ -57,109 +56,18 @@ public:
     }
 };
 
-class Menu {
-private:
-    Game* game;
-    sf::Font font;
-    sf::Text startText;
-    sf::Text difficultyText;
-    Difficulty currentDifficulty;
-    std::vector<std::string> difficultyOptions = {"Easy", "Medium", "Hard"};
-
-public:
-    explicit Menu(Game* game) : game(game), currentDifficulty(Difficulty::Easy) {
-        // Load the font
-        if (!font.loadFromFile("path/to/font.ttf")) {
-            // Handle error, e.g., print an error message or use a default font
-            std::cerr << "Failed to load font." << std::endl;
-        }
-
-        // Initialize the start text
-        startText.setFont(font);
-        startText.setString("Start Game");
-        startText.setCharacterSize(24);
-        startText.setFillColor(sf::Color::White);
-        startText.setPosition(WIDTH / 2.f, HEIGHT / 2.f);
-
-        // Initialize the difficulty option text
-        difficultyText.setFont(font);
-        difficultyText.setString("Difficulty: Easy");
-        difficultyText.setCharacterSize(24);
-        difficultyText.setFillColor(sf::Color::White);
-        difficultyText.setPosition(WIDTH / 2.f, HEIGHT / 2.f + 60.f);
-    }
-
-    void display(sf::RenderWindow& window) {
-        window.draw(startText);
-        window.draw(difficultyText);
-    }
-
-    void handleInput(const sf::Event& event) {
-        if (event.type == sf::Event::KeyPressed) {
-            switch (event.key.code) {
-                case sf::Keyboard::Up:
-                    changeDifficulty(-1); // Cycle up in difficulty
-                    break;
-                case sf::Keyboard::Down:
-                    changeDifficulty(1); // Cycle down in difficulty
-                    break;
-                case sf::Keyboard::Enter:
-                    game->startGame(currentDifficulty); // Start the game with the current difficulty
-                    break;
-            }
-        }
-    }
-
-    void changeDifficulty(int change) {
-        int difficultyIndex = static_cast<int>(currentDifficulty) + change;
-        // Wrap around the difficulty options
-        if (difficultyIndex >= static_cast<int>(difficultyOptions.size())) {
-            difficultyIndex = 0;
-        } else if (difficultyIndex < 0) {
-            difficultyIndex = difficultyOptions.size() - 1;
-        }
-        currentDifficulty = static_cast<Difficulty>(difficultyIndex);
-        difficultyText.setString("Difficulty: " + difficultyOptions[difficultyIndex]);
-    }
-
-    // Accessor methods for the text objects
-    sf::Text& getStartText() { return startText; }
-    sf::Text& getDifficultyText() { return difficultyText; }
-};
-
 class Cell {
 private:
     CellState state;
     bool isMine;
     int adjacentMines;
-    sf::Sprite sprite;
-
-    static sf::Texture hiddenTexture;
-    static sf::Texture mineTexture;
-    static sf::Texture flagTexture;
-    static std::vector<sf::Texture> numberTextures;
 
 public:
-    Cell() : state(CellState::Hidden), isMine(false), adjacentMines(0) {
-        sprite.setTexture(hiddenTexture); // Set the default texture
-    }
-
-    // Static method to load textures (call this method before creating Cell instances)
-    static void loadTextures() {
-        hiddenTexture.loadFromFile("path/to/hiddenTexture.png");
-        mineTexture.loadFromFile("path/to/mineTexture.png");
-        flagTexture.loadFromFile("path/to/flagTexture.png");
-        numberTextures.resize(8); // Resize the vector to hold 8 textures
-
-        for (int i = 0; i < 8; ++i) {
-            numberTextures[i].loadFromFile("path/to/number" + std::to_string(i + 1) + ".png");
-        }
-    }
+    Cell() : state(CellState::Hidden), isMine(false), adjacentMines(0) {}
 
     void reveal() {
         if (state == CellState::Hidden) {
             state = CellState::Revealed;
-            updateSprite(); // Update the sprite based on the new state
         }
     }
 
@@ -169,13 +77,12 @@ public:
         } else if (state == CellState::Flagged) {
             state = CellState::Hidden;
         }
-        updateSprite(); // Update the sprite to show/hide the flag
     }
 
     void setMine(bool mine) {
         isMine = mine;
         if (mine) {
-            adjacentMines = 0; // Reset adjacent mines count if it's a mine
+            adjacentMines = 0; // A mine cell has no adjacent mines
         }
     }
 
@@ -185,45 +92,13 @@ public:
         }
     }
 
-    // Getters for cell properties
+    // Accessors
     bool containsMine() const { return isMine; }
     int getAdjacentMines() const { return adjacentMines; }
     CellState getState() const { return state; }
     bool isRevealed() const { return state == CellState::Revealed; }
     bool isFlagged() const { return state == CellState::Flagged; }
-
-    const sf::Sprite& getSprite() const { return sprite; }
-
-private:
-    void updateSprite() {
-        switch (state) {
-            case CellState::Hidden:
-                sprite.setTexture(hiddenTexture);
-                break;
-            case CellState::Revealed:
-                if (isMine) {
-                    sprite.setTexture(mineTexture);
-                } else {
-                    if (adjacentMines > 0) {
-                        sprite.setTexture(numberTextures[adjacentMines - 1]);
-                    } else {
-                        // If no adjacent mines, you might have a different texture for empty revealed cells
-                    }
-                }
-                break;
-            case CellState::Flagged:
-                sprite.setTexture(flagTexture);
-                break;
-        }
-    }
 };
-
-// Static texture initialization
-sf::Texture Cell::hiddenTexture;
-sf::Texture Cell::mineTexture;
-sf::Texture Cell::flagTexture;
-std::vector<sf::Texture> Cell::numberTextures;
-
 
 class Board {
 private:
@@ -236,8 +111,6 @@ private:
 public:
     Board(int w, int h, int m) : width(w), height(h), mineCount(m), firstClick(true) {
         cells.resize(height, std::vector<Cell>(width));
-        // Initialize each cell (assuming Cell class has a method for texture loading)
-        Cell::loadTextures();
     }
 
     void placeMines(int excludedX, int excludedY) {
@@ -287,7 +160,6 @@ public:
             cell.reveal();
 
             if (cell.getAdjacentMines() == 0 && !cell.containsMine()) {
-                // Recursively reveal adjacent cells
                 for (int dy = -1; dy <= 1; dy++) {
                     for (int dx = -1; dx <= 1; dx++) {
                         if (dx == 0 && dy == 0) continue;
@@ -300,11 +172,7 @@ public:
 
     void flagCell(int x, int y) {
         if (x < 0 || x >= width || y < 0 || y >= height) return;
-        Cell& cell = cells[y][x];
-
-        if (!cell.isRevealed()) {
-            cell.toggleFlag();
-        }
+        cells[y][x].toggleFlag();
     }
 
     bool checkWinCondition() const {
@@ -329,63 +197,180 @@ public:
         return false;
     }
 
-    // Method to get the grid of cells for rendering
+    int countFlaggedCells() const {
+        int flagCount = 0;
+        for (const auto& row : cells) {
+            for (const auto& cell : row) {
+                if (cell.isFlagged()) {
+                    ++flagCount;
+                }
+            }
+        }
+        return flagCount;
+    }
+
     const std::vector<std::vector<Cell>>& getCells() const {
         return cells;
     }
 };
 
+class Menu {
+private:
+    Game *game;
+    sf::Font font;
+    sf::Text startText;
+    sf::Text difficultyText;
+    Difficulty currentDifficulty;
+    std::vector<std::string> difficultyOptions = {"Easy", "Medium", "Hard"};
+
+public:
+    explicit Menu(Game *game);
+    void handleInput(const sf::Event &event);
+    void changeDifficulty(int change);
+    const sf::Text &getStartText() const;
+    const sf::Text &getDifficultyText() const;
+};
+
 class Renderer {
 private:
     sf::RenderWindow& window;
+    sf::Font uiFont;
+    sf::Text flagCounterText;
+    sf::Text timerText;
+    sf::Text endGameText;
+
+    static sf::Texture hiddenTexture;
+    static sf::Texture mineTexture;
+    static sf::Texture flagTexture;
+    static std::vector<sf::Texture> numberTextures;
 
 public:
-    explicit Renderer(sf::RenderWindow& win) : window(win) {}
+    explicit Renderer(sf::RenderWindow& win) : window(win) {
+        loadTextures();
+        if (!uiFont.loadFromFile("font/Lato-Black.ttf")) {
+            std::cerr << "Failed to load UI font." << std::endl;
+        }
+        initializeUIText();
+    }
+
+    static void loadTextures() {
+        hiddenTexture.loadFromFile("sprites/Cell.png");
+        mineTexture.loadFromFile("sprites/Bomb.png");
+        flagTexture.loadFromFile("sprites/Flag.png");
+        numberTextures.resize(8);
+        for (int i = 0; i < 8; ++i) {
+            numberTextures[i].loadFromFile("sprites/number" + std::to_string(i + 1) + ".png");
+        }
+    }
+
+    void initializeUIText() {
+        // Initialize Flag Counter Text
+        flagCounterText.setFont(uiFont);
+        flagCounterText.setCharacterSize(24);
+        flagCounterText.setFillColor(sf::Color::White);
+        flagCounterText.setPosition(10, 10); // Placeholder position
+
+        // Initialize Timer Text
+        timerText.setFont(uiFont);
+        timerText.setCharacterSize(24);
+        timerText.setFillColor(sf::Color::White);
+        timerText.setPosition(10, 40); // Placeholder position
+
+        // Initialize End Game Message Text
+        endGameText.setFont(uiFont);
+        endGameText.setCharacterSize(24);
+        endGameText.setFillColor(sf::Color::White);
+        endGameText.setPosition(200, 200); // Placeholder position
+    }
 
     void drawBoard(const Board& board) {
-        // Assuming Board class has a method to get the grid of cells
         const auto& cells = board.getCells();
-        for (const auto& row : cells) {
-            for (const auto& cell : row) {
-                // Assuming Cell class has a method to get its sprite
-                window.draw(cell.getSprite());
+        for (size_t i = 0; i < cells.size(); ++i) {
+            for (size_t j = 0; j < cells[i].size(); ++j) {
+                sf::Sprite sprite;
+                sprite.setPosition(i * 30, j * 30); // Assuming cell size is 30x30
+
+                switch(cells[i][j].getState()) {
+                    case CellState::Hidden:
+                        sprite.setTexture(hiddenTexture);
+                        break;
+                    case CellState::Revealed:
+                        if(cells[i][j].containsMine()) {
+                            sprite.setTexture(mineTexture);
+                        } else {
+                            int adjacentMines = cells[i][j].getAdjacentMines();
+                            if(adjacentMines > 0) {
+                                sprite.setTexture(numberTextures[adjacentMines - 1]);
+                            } else {
+                                sprite.setTextureRect(sf::IntRect(0, 0, 1, 1)); // Empty cell
+                                sprite.setColor(sf::Color::White);
+                                sprite.setScale(30, 30);
+                            }
+                        }
+                        break;
+                    case CellState::Flagged:
+                        sprite.setTexture(flagTexture);
+                        break;
+                }
+                window.draw(sprite);
             }
         }
     }
 
-    void drawMenu(const Menu& menu) {
-        // Draw the menu text objects
-        // Assuming Menu class has methods to get the text objects
+    void drawMenu(Menu menu) {
         window.draw(menu.getStartText());
         window.draw(menu.getDifficultyText());
-        // If you have more menu items, draw them here as well
     }
 
-    // You can add additional drawing methods if needed...
+    void updateFlagCounter(int flags) {
+        flagCounterText.setString("Flags: " + std::to_string(flags));
+    }
+
+    void updateTimer(float time) {
+        timerText.setString("Time: " + std::to_string(static_cast<int>(time)));
+    }
+
+    void setEndGameMessage(const std::string& message) {
+        endGameText.setString(message);
+    }
+
+    void drawUI() {
+        window.draw(flagCounterText);
+        window.draw(timerText);
+        window.draw(endGameText);
+    }
 };
 
+// Define static members
+sf::Texture Renderer::hiddenTexture;
+sf::Texture Renderer::mineTexture;
+sf::Texture Renderer::flagTexture;
+std::vector<sf::Texture> Renderer::numberTextures;
 
 class Game {
 private:
     sf::RenderWindow window;
     Timer timer;
-    Board* board; // Dynamically allocated based on difficulty
+    Board* board;
     Menu menu;
     Renderer renderer;
     Difficulty difficulty;
     bool game_over;
 
+    static constexpr int CELL_WIDTH = 16;
+    static constexpr int CELL_HEIGHT = 16;
+    static constexpr int UI_HEIGHT = 100; // Space for UI elements like timer and flag count
+
+    int flagCount;
+    float elapsedTime;
+
 public:
     Game() : window(sf::VideoMode(WIDTH, HEIGHT), "Minesweeper"),
-             board(nullptr), // Initialize as nullptr
-             menu(this),
-             renderer(window),
-             game_over(true) { // Start with the menu displayed
-        Cell::loadTextures(); // Load textures for cells
-    }
+             board(nullptr), menu(this), renderer(window), game_over(true),
+             flagCount(0), elapsedTime(0) {}
 
     ~Game() {
-        delete board; // Clean up board memory
+        delete board;
     }
 
     void run() {
@@ -403,83 +388,155 @@ public:
     void handleEvent(const sf::Event& event) {
         if (event.type == sf::Event::Closed) {
             window.close();
-        }
-
-        if (game_over) {
+        } else if (game_over) {
             menu.handleInput(event);
-        } else {
-            // Handle game interactions here (mouse events)
-            if (event.type == sf::Event::MouseButtonPressed) {
-                handleMouseInput(event.mouseButton);
-            }
+        } else if (event.type == sf::Event::MouseButtonPressed) {
+            handleMouseInput(event.mouseButton);
         }
     }
 
     void handleMouseInput(const sf::Event::MouseButtonEvent& mouseEvent) {
-        // Example: Convert mouse position to board coordinates and reveal or flag the cell
+        if (!board) return;
+
+        int x, y;
+        std::tie(x, y) = convertToBoardCoordinates(mouseEvent.x, mouseEvent.y);
+
         if (mouseEvent.button == sf::Mouse::Left) {
-            // Left click: reveal cell
-            // Convert mouse position to board coordinates (you'll need to implement this)
-            int x, y;
-            std::tie(x, y) = convertToBoardCoordinates(mouseEvent.x, mouseEvent.y);
             board->revealCell(x, y);
+            checkGameState();
         } else if (mouseEvent.button == sf::Mouse::Right) {
-            // Right click: flag cell
-            int x, y;
-            std::tie(x, y) = convertToBoardCoordinates(mouseEvent.x, mouseEvent.y);
             board->flagCell(x, y);
+            updateFlagCount();
+        }
+    }
+
+    void updateFlagCount() {
+        if (board) {
+            flagCount = board->countFlaggedCells();
+            renderer.updateFlagCounter(flagCount);
         }
     }
 
     std::pair<int, int> convertToBoardCoordinates(int mouseX, int mouseY) {
-        // Convert mouse coordinates to board cell indices
-        // This depends on your cell size and board layout
-        int x = mouseX / cellWidth;  // cellWidth to be defined based on your cell size
-        int y = mouseY / cellHeight; // cellHeight to be defined
+        int x = mouseX / CELL_WIDTH;
+        int y = mouseY / CELL_HEIGHT;
         return {x, y};
     }
 
     void startGame(Difficulty chosenDifficulty) {
         difficulty = chosenDifficulty;
-        delete board; // Delete the old board if it exists
-        // Create a new board based on the chosen difficulty
-        int width, height, mines;
-        // Define width, height, and mines based on difficulty...
-        board = new Board(width, height, mines);
+        setupBoard(difficulty);
         timer.start();
         game_over = false;
+        flagCount = 0;
+        elapsedTime = 0;
+    }
+
+    void setupBoard(Difficulty difficulty) {
+        int width, height, mines;
+        switch (difficulty) {
+            case Difficulty::Easy:
+                width = 10; height = 8; mines = 10;
+                break;
+            case Difficulty::Medium:
+                width = 16; height = 16; mines = 40;
+                break;
+            case Difficulty::Hard:
+                width = 24; height = 20; mines = 99;
+                break;
+        }
+        window.setSize(sf::Vector2u(width * CELL_WIDTH, height * CELL_HEIGHT + UI_HEIGHT));
+        delete board;
+        board = new Board(width, height, mines);
     }
 
     void endGame(bool won) {
         timer.stop();
         game_over = true;
-        // Handle game end scenario (display message, etc.)
+        renderer.setEndGameMessage(won ? "You Won!" : "Game Over");
+    }
+
+    void checkGameState() {
+        if (board->checkWinCondition()) {
+            endGame(true);
+        } else if (board->checkLossCondition()) {
+            endGame(false);
+        }
     }
 
 private:
     void update() {
         if (!game_over) {
-            if (board->checkWinCondition()) {
-                endGame(true);
-            } else if (board->checkLossCondition()) {
-                endGame(false);
-            }
-            // Update other game logic if necessary
+            elapsedTime = timer.getElapsedTime();
+            renderer.updateTimer(elapsedTime);
         }
     }
 
     void render() {
         window.clear();
-        if (!game_over) {
+        if (!game_over && board) {
             renderer.drawBoard(*board);
         } else {
             renderer.drawMenu(menu);
         }
+        renderer.drawUI();
         window.display();
     }
-
-    // Other private methods...
 };
+
+Menu::Menu(Game *game) : game(game), currentDifficulty(Difficulty::Easy) {
+    if (!font.loadFromFile("font/Lato-Black.ttf")) {
+        std::cerr << "Failed to load font." << std::endl;
+    }
+
+    startText.setFont(font);
+    startText.setString("Start Game");
+    startText.setCharacterSize(24);
+    startText.setFillColor(sf::Color::White);
+    startText.setPosition(WIDTH / 2.f, HEIGHT / 2.f);
+
+    difficultyText.setFont(font);
+    difficultyText.setString("Difficulty: Easy"); // Default difficulty
+    difficultyText.setCharacterSize(24);
+    difficultyText.setFillColor(sf::Color::White);
+    difficultyText.setPosition(WIDTH / 2.f, HEIGHT / 2.f + 60.f);
+}
+
+void Menu::handleInput(const sf::Event &event) {
+    if (event.type == sf::Event::KeyPressed) {
+        switch (event.key.code) {
+            case sf::Keyboard::Up:
+                changeDifficulty(-1);
+                break;
+            case sf::Keyboard::Down:
+                changeDifficulty(1);
+                break;
+            case sf::Keyboard::Enter:
+                game->startGame(currentDifficulty);
+                break;
+        }
+    }
+}
+
+void Menu::changeDifficulty(int change) {
+    int difficultyIndex = static_cast<int>(currentDifficulty) + change;
+    if (difficultyIndex >= static_cast<int>(difficultyOptions.size())) {
+        difficultyIndex = 0;
+    } else if (difficultyIndex < 0) {
+        difficultyIndex = difficultyOptions.size() - 1;
+    }
+    currentDifficulty = static_cast<Difficulty>(difficultyIndex);
+    difficultyText.setString("Difficulty: " + difficultyOptions[difficultyIndex]);
+}
+
+const sf::Text &Menu::getStartText() const {
+    return startText;
+}
+
+const sf::Text &Menu::getDifficultyText() const {
+    return difficultyText;
+}
+
 
 int main() {
     Game minesweeper;
