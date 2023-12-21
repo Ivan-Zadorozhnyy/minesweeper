@@ -82,7 +82,7 @@ public:
     void setMine(bool mine) {
         isMine = mine;
         if (mine) {
-            adjacentMines = 0; // A mine cell has no adjacent mines
+            adjacentMines = 0;
         }
     }
 
@@ -92,7 +92,6 @@ public:
         }
     }
 
-    // Accessors
     bool containsMine() const { return isMine; }
     int getAdjacentMines() const { return adjacentMines; }
     CellState getState() const { return state; }
@@ -112,9 +111,6 @@ public:
     Board(int w, int h, int m) : width(w), height(h), mineCount(m), firstClick(true) {
         cells.resize(height, std::vector<Cell>(width));
     }
-
-    int getWidth() const { return width; }
-    int getHeight() const { return height; }
 
     bool isFirstClick() const {
         return firstClick;
@@ -214,6 +210,10 @@ public:
             }
         }
         return flagCount;
+    }
+
+    int getMineCount() const {
+        return mineCount;
     }
 
     const std::vector<std::vector<Cell>>& getCells() const {
@@ -331,9 +331,6 @@ public:
         window.draw(menu.getDifficultyText());
     }
 
-    void updateFlagCounter(int flags) {
-        flagCounterText.setString("Flags: " + std::to_string(flags));
-    }
 
     void updateTimer(float time) {
         timerText.setString("Time: " + std::to_string(static_cast<int>(time)));
@@ -342,12 +339,13 @@ public:
     void setEndGameMessage(const std::string& message) {
         endGameText.setString(message);
         endGameText.setPosition(window.getSize().x / 2.f - endGameText.getGlobalBounds().width / 2,
-                                window.getSize().y / 2.f - endGameText.getGlobalBounds().height / 2);
+                                window.getSize().y / 2.f - endGameText.getGlobalBounds().height / 2 - 50);
         window.draw(endGameText); // Draw immediately to display the message
     }
 
-    void drawUI(int flags, float time) {
-        updateFlagCounter(flags);
+    void drawUI(int mineCount, int flags, float time) {
+        int flagsLeft = mineCount - flags; // Calculate flags left
+        flagCounterText.setString("Flags: " + std::to_string(flagsLeft));
         updateTimer(time);
         window.draw(flagCounterText);
         window.draw(timerText);
@@ -356,15 +354,14 @@ public:
     void drawEndGameMessage() {
         if (!endGameText.getString().isEmpty()) {
             endGameText.setPosition(
-                    (window.getSize().x - endGameText.getLocalBounds().width) / 2.f,
-                    (window.getSize().y - endGameText.getLocalBounds().height) / 2.f
+                    window.getSize().x / 2.f - endGameText.getGlobalBounds().width / 2,
+                    window.getSize().y / 2.f - endGameText.getGlobalBounds().height / 2 - 50
             );
             window.draw(endGameText);
         }
     }
 };
 
-// Define static members
 sf::Texture Renderer::hiddenTexture;
 sf::Texture Renderer::mineTexture;
 sf::Texture Renderer::flagTexture;
@@ -452,6 +449,7 @@ public:
     void startGame(Difficulty chosenDifficulty) {
         difficulty = chosenDifficulty;
         setupBoard(difficulty);
+        timer.reset();
         timer.start();
         game_over = false;
         flagCount = 0;
@@ -508,7 +506,9 @@ public:
         } else {
             renderer.drawMenu(menu);
         }
-        renderer.drawUI(flagCount, elapsedTime);
+        if (!game_over && board) {
+            renderer.drawUI(board->getMineCount(), flagCount, elapsedTime);
+        }
         if (game_over) {
             renderer.drawEndGameMessage();
         }
