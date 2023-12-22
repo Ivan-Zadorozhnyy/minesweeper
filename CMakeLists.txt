@@ -1,15 +1,12 @@
 cmake_minimum_required(VERSION 3.26)
-set(CMAKE_VERBOSE_MAKEFILE on)
-project(untitled8)
+project(minesweeper)
 
 set(CMAKE_CXX_STANDARD 17)
 
-set(SFML_DIR "/Users/ivanzadorozhnyy/Downloads/SFML-2.6.1-macOS-clang-arm64/lib")
+set(SOURCE_FILES main.cpp)
+add_executable(minesweeper ${SOURCE_FILES})
+include_directories(/usr/local/include)
 
-include_directories("/Users/ivanzadorozhnyy/Downloads/SFML-2.6.1-macOS-clang-arm64/include")
-
-link_directories("/Users/ivanzadorozhnyy/Downloads/SFML-2.6.1-macOS-clang-arm64/lib")
-
-add_executable(cmakeProject main.cpp)
-
-target_link_libraries(cmakeProject sfml-graphics sfml-window sfml-system)
+find_package(SFML 2.6.1 COMPONENTS system window graphics network audio REQUIRED)
+include_directories(${SFML_INCLUDE_DIRS})
+target_link_libraries(minesweeper sfml-system sfml-window sfml-graphics sfml-audio sfml-network)

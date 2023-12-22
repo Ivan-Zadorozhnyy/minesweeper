@@ -1,9 +1,13 @@
-#include <SFML/Graphics.hpp>
 #include <vector>
 #include <chrono>
 #include <random>
 #include <iostream>
 #include <fstream>
+
+#include <SFML/Graphics.hpp>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 class Game;
 class Menu;
@@ -13,7 +17,7 @@ constexpr int WIDTH = 1280;
 constexpr int HEIGHT = 720;
 
 enum class Difficulty {
-    Easy, Medium, Hard
+    Easy = 1, Medium, Hard
 };
 
 enum class CellState{
@@ -110,6 +114,7 @@ public:
     CellState getState() const { return state; }
     bool isRevealed() const { return state == CellState::Revealed; }
     bool isFlagged() const { return state == CellState::Flagged; }
+    bool getIsMine() const { return isMine; }
 };
 
 class Board {
@@ -442,7 +447,7 @@ public:
     void run() {
         std::ifstream testFile("savegame.bin", std::ios::binary);
         if (testFile.good()) {
-            loadGame("savegame.bin");
+            loadGame("save.json");
         }
         testFile.close();
 
@@ -466,7 +471,7 @@ public:
 
     void handleEvent(const sf::Event& event) {
         if (event.type == sf::Event::Closed) {
-            saveGame("savegame.bin");
+            saveGame("save.json");
             window.close();
         } else if (game_over) {
             menu.handleInput(event);
@@ -575,22 +580,52 @@ public:
     }
 
     void saveGame(const std::string& filename) {
-        std::ofstream file(filename, std::ios::binary);
+        std::ofstream file(filename);
         if (!file) {
             std::cerr << "Failed to open file for saving." << std::endl;
             return;
         }
 
-        file.write(reinterpret_cast<const char*>(&elapsedTime), sizeof(elapsedTime));
-        file.write(reinterpret_cast<const char*>(&flagCount), sizeof(flagCount));
-        int diff = static_cast<int>(difficulty);
-        file.write(reinterpret_cast<const char*>(&diff), sizeof(diff));
+        // --- serialize board --- //
 
-        board->serialize(file);
+        json jsonBoard;
+        jsonBoard["width"] = board->getWidth();
+        jsonBoard["height"] = board->getHeight();
+        jsonBoard["mineCount"] = board->getMineCount();
+        jsonBoard["firstClick"] = board->isFirstClick();
+
+        json jsonCells = json::array();
+        for (const auto& row : board->getCells()) {
+            for (const auto& cell : row) {
+                json jsonCell;
+                jsonCell["state"] = cell.getState();
+                jsonCell["isMine"] = cell.getIsMine();
+                jsonCell["adjacentMines"] = cell.getAdjacentMines();
+                jsonCells.push_back(jsonCell);
+            }
+        }
+
+        jsonBoard["cells"] = jsonCells;
+
+        // --- serialize game --- //
+
+        json jsonGame;
+        jsonGame["elapsedTime"] = elapsedTime;
+        jsonGame["flagCount"] = flagCount;
+        jsonGame["difficulty"] = static_cast<int>(difficulty);
+        jsonGame["board"] = jsonBoard;
+
+        file << std::setw(2) << jsonGame << std::endl;
         file.close();
     }
 
     void loadGame(const std::string& filename) {
+        std::ifstream qfile(filename);
+        json jsonSave;
+        qfile >> jsonSave;
+        // use jsonSave["game"]["board"]...
+        // https://github.com/nlohmann/json?tab=readme-ov-file#tofrom-streams-eg-files-string-streams
+
         std::ifstream file(filename, std::ios::binary);
         if (!file) {
             std::cerr << "No save file found, starting a new game" << std::endl;
