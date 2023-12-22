@@ -17,7 +17,7 @@ constexpr int WIDTH = 1280;
 constexpr int HEIGHT = 720;
 
 enum class Difficulty {
-    Easy = 1, Medium, Hard
+    Easy , Medium, Hard
 };
 
 enum class CellState{
@@ -97,17 +97,20 @@ public:
         }
     }
 
-    void serialize(std::ostream& os) const {
-        os.write(reinterpret_cast<const char*>(&state), sizeof(state));
-        os.write(reinterpret_cast<const char*>(&isMine), sizeof(isMine));
-        os.write(reinterpret_cast<const char*>(&adjacentMines), sizeof(adjacentMines));
+    json serialize() const {
+        return {
+                {"state", static_cast<int>(state)},
+                {"isMine", isMine},
+                {"adjacentMines", adjacentMines}
+        };
     }
 
-    void deserialize(std::istream& is) {
-        is.read(reinterpret_cast<char*>(&state), sizeof(state));
-        is.read(reinterpret_cast<char*>(&isMine), sizeof(isMine));
-        is.read(reinterpret_cast<char*>(&adjacentMines), sizeof(adjacentMines));
+    void deserialize(const json& j) {
+        state = static_cast<CellState>(j.at("state").get<int>());
+        isMine = j.at("isMine").get<bool>();
+        adjacentMines = j.at("adjacentMines").get<int>();
     }
+
 
     bool containsMine() const { return isMine; }
     int getAdjacentMines() const { return adjacentMines; }
@@ -241,27 +244,39 @@ public:
         return cells;
     }
 
-    void serialize(std::ostream& os) const {
-        os.write(reinterpret_cast<const char*>(&width), sizeof(width));
-        os.write(reinterpret_cast<const char*>(&height), sizeof(height));
-        os.write(reinterpret_cast<const char*>(&mineCount), sizeof(mineCount));
-        os.write(reinterpret_cast<const char*>(&firstClick), sizeof(firstClick));
+    json serialize() const {
+        json boardJson = {
+                {"width", width},
+                {"height", height},
+                {"mineCount", mineCount},
+                {"firstClick", firstClick},
+                {"cells", json::array()}
+        };
+
         for (const auto& row : cells) {
             for (const auto& cell : row) {
-                cell.serialize(os);
+                boardJson["cells"].push_back(cell.serialize());
             }
         }
+
+        return boardJson;
     }
 
-    void deserialize(std::istream& is) {
-        is.read(reinterpret_cast<char*>(&width), sizeof(width));
-        is.read(reinterpret_cast<char*>(&height), sizeof(height));
-        is.read(reinterpret_cast<char*>(&mineCount), sizeof(mineCount));
-        is.read(reinterpret_cast<char*>(&firstClick), sizeof(firstClick));
+    void deserialize(const json& j) {
+        width = j.at("width").get<int>();
+        height = j.at("height").get<int>();
+        mineCount = j.at("mineCount").get<int>();
+        firstClick = j.at("firstClick").get<bool>();
+
+        const auto& cellsJson = j.at("cells");
+        cells.clear();
         cells.resize(height, std::vector<Cell>(width));
+
+        size_t index = 0;
         for (auto& row : cells) {
             for (auto& cell : row) {
-                cell.deserialize(is);
+                cell.deserialize(cellsJson[index]);
+                index++;
             }
         }
     }
@@ -439,13 +454,13 @@ public:
 
     ~Game() {
         if (isLoaded) {
-            saveGame("savegame.bin");
+            //saveGame("savegame.bin");
         }
         delete board;
     }
 
     void run() {
-        std::ifstream testFile("savegame.bin", std::ios::binary);
+        std::ifstream testFile("save.json");
         if (testFile.good()) {
             loadGame("save.json");
         }
@@ -456,15 +471,19 @@ public:
             while (window.pollEvent(event)) {
                 handleEvent(event);
                 if (event.type == sf::Event::Closed) {
-                    saveGame("savegame.bin");
+                    saveGame("save.json");
                     window.close();
                 }
             }
 
             if (!game_over) {
                 update();
+                render();
+            } else {
+                window.clear();
+                renderer.drawMenu(menu);
+                window.display();
             }
-            render();
         }
     }
 
@@ -586,75 +605,49 @@ public:
             return;
         }
 
-        // --- serialize board --- //
+        json gameJson = {
+                {"elapsedTime", elapsedTime},
+                {"flagCount", flagCount},
+                {"difficulty", static_cast<int>(difficulty)},
+                {"board", board ? board->serialize() : json()}
+        };
 
-        json jsonBoard;
-        jsonBoard["width"] = board->getWidth();
-        jsonBoard["height"] = board->getHeight();
-        jsonBoard["mineCount"] = board->getMineCount();
-        jsonBoard["firstClick"] = board->isFirstClick();
-
-        json jsonCells = json::array();
-        for (const auto& row : board->getCells()) {
-            for (const auto& cell : row) {
-                json jsonCell;
-                jsonCell["state"] = cell.getState();
-                jsonCell["isMine"] = cell.getIsMine();
-                jsonCell["adjacentMines"] = cell.getAdjacentMines();
-                jsonCells.push_back(jsonCell);
-            }
-        }
-
-        jsonBoard["cells"] = jsonCells;
-
-        // --- serialize game --- //
-
-        json jsonGame;
-        jsonGame["elapsedTime"] = elapsedTime;
-        jsonGame["flagCount"] = flagCount;
-        jsonGame["difficulty"] = static_cast<int>(difficulty);
-        jsonGame["board"] = jsonBoard;
-
-        file << std::setw(2) << jsonGame << std::endl;
+        file << gameJson.dump(4);
         file.close();
     }
 
     void loadGame(const std::string& filename) {
-        std::ifstream qfile(filename);
-        json jsonSave;
-        qfile >> jsonSave;
-        // use jsonSave["game"]["board"]...
-        // https://github.com/nlohmann/json?tab=readme-ov-file#tofrom-streams-eg-files-string-streams
-
-        std::ifstream file(filename, std::ios::binary);
+        std::ifstream file(filename);
         if (!file) {
             std::cerr << "No save file found, starting a new game" << std::endl;
             return;
         }
 
-        file.read(reinterpret_cast<char*>(&elapsedTime), sizeof(elapsedTime));
-        file.read(reinterpret_cast<char*>(&flagCount), sizeof(flagCount));
-        int diff;
-        file.read(reinterpret_cast<char*>(&diff), sizeof(diff));
-        difficulty = static_cast<Difficulty>(diff);
-        game_over = false;
+        json gameJson;
+        file >> gameJson;
 
-        int width, height, mines;
-        bool first_click;
-        file.read(reinterpret_cast<char*>(&width), sizeof(width));
-        file.read(reinterpret_cast<char*>(&height), sizeof(height));
-        file.read(reinterpret_cast<char*>(&mines), sizeof(mines));
-        file.read(reinterpret_cast<char*>(&first_click), sizeof(first_click));
+        elapsedTime = gameJson.at("elapsedTime").get<float>();
+        flagCount = gameJson.at("flagCount").get<int>();
+        difficulty = static_cast<Difficulty>(gameJson.at("difficulty").get<int>());
 
-        if (board) delete board;
-        board = new Board(width, height, mines);
-        board->deserialize(file);
+        if (gameJson.contains("board") && gameJson["board"].is_object()) {
+            auto& boardJson = gameJson["board"];
+            int loadedWidth = boardJson.at("width").get<int>();
+            int loadedHeight = boardJson.at("height").get<int>();
+            int loadedMineCount = boardJson.at("mineCount").get<int>();
+
+            if (board) delete board;
+            board = new Board(loadedWidth, loadedHeight, loadedMineCount);
+            board->deserialize(boardJson);
+        }
+
+        CELL_WIDTH = WIDTH / board->getWidth();
+        CELL_HEIGHT = (HEIGHT - UI_HEIGHT) / board->getHeight();
+
         file.close();
-
+        game_over = false;
         isLoaded = true;
     }
-
-
 };
 
 Menu::Menu(Game *game) : game(game), currentDifficulty(Difficulty::Easy) {
