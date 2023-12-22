@@ -3,6 +3,7 @@
 #include <chrono>
 #include <random>
 #include <iostream>
+#include <fstream>
 
 class Game;
 class Menu;
@@ -15,7 +16,7 @@ enum class Difficulty {
     Easy, Medium, Hard
 };
 
-enum class CellState {
+enum class CellState: uint8_t{
     Hidden, Revealed, Flagged
 };
 
@@ -92,6 +93,18 @@ public:
         }
     }
 
+    void serialize(std::ostream& os) const {
+        os.write(reinterpret_cast<const char*>(&state), sizeof(state));
+        os.write(reinterpret_cast<const char*>(&isMine), sizeof(isMine));
+        os.write(reinterpret_cast<const char*>(&adjacentMines), sizeof(adjacentMines));
+    }
+
+    void deserialize(std::istream& is) {
+        is.read(reinterpret_cast<char*>(&state), sizeof(state));
+        is.read(reinterpret_cast<char*>(&isMine), sizeof(isMine));
+        is.read(reinterpret_cast<char*>(&adjacentMines), sizeof(adjacentMines));
+    }
+
     bool containsMine() const { return isMine; }
     int getAdjacentMines() const { return adjacentMines; }
     CellState getState() const { return state; }
@@ -111,6 +124,9 @@ public:
     Board(int w, int h, int m) : width(w), height(h), mineCount(m), firstClick(true) {
         cells.resize(height, std::vector<Cell>(width));
     }
+
+    int getWidth() const { return width; }
+    int getHeight() const { return height; }
 
     bool isFirstClick() const {
         return firstClick;
@@ -218,6 +234,31 @@ public:
 
     const std::vector<std::vector<Cell>>& getCells() const {
         return cells;
+    }
+
+    void serialize(std::ostream& os) const {
+        os.write(reinterpret_cast<const char*>(&width), sizeof(width));
+        os.write(reinterpret_cast<const char*>(&height), sizeof(height));
+        os.write(reinterpret_cast<const char*>(&mineCount), sizeof(mineCount));
+        os.write(reinterpret_cast<const char*>(&firstClick), sizeof(firstClick));
+        for (const auto& row : cells) {
+            for (const auto& cell : row) {
+                cell.serialize(os);
+            }
+        }
+    }
+
+    void deserialize(std::istream& is) {
+        is.read(reinterpret_cast<char*>(&width), sizeof(width));
+        is.read(reinterpret_cast<char*>(&height), sizeof(height));
+        is.read(reinterpret_cast<char*>(&mineCount), sizeof(mineCount));
+        is.read(reinterpret_cast<char*>(&firstClick), sizeof(firstClick));
+        cells.resize(height, std::vector<Cell>(width));
+        for (auto& row : cells) {
+            for (auto& cell : row) {
+                cell.deserialize(is);
+            }
+        }
     }
 };
 
@@ -381,32 +422,51 @@ private:
     static constexpr int UI_HEIGHT = 100;
     int flagCount;
     float elapsedTime;
+    bool isLoaded = false;
 
 public:
     Game() : window(sf::VideoMode(WIDTH, HEIGHT), "Minesweeper", sf::Style::Close),
              board(nullptr), menu(this), renderer(window), game_over(true),
              flagCount(0), elapsedTime(0) {
         window.setFramerateLimit(60);
+        //loadGame("savegame.bin");
     }
 
     ~Game() {
+        if (isLoaded) {
+            saveGame("savegame.bin");
+        }
         delete board;
     }
 
     void run() {
+        std::ifstream testFile("savegame.bin", std::ios::binary);
+        if (testFile.good()) {
+            loadGame("savegame.bin");
+        }
+        testFile.close();
+
         while (window.isOpen()) {
             sf::Event event;
             while (window.pollEvent(event)) {
                 handleEvent(event);
+                if (event.type == sf::Event::Closed) {
+                    saveGame("savegame.bin");
+                    window.close();
+                }
             }
 
-            update();
+            if (!game_over) {
+                update();
+            }
             render();
         }
     }
 
+
     void handleEvent(const sf::Event& event) {
         if (event.type == sf::Event::Closed) {
+            saveGame("savegame.bin");
             window.close();
         } else if (game_over) {
             menu.handleInput(event);
@@ -513,6 +573,53 @@ public:
         }
         window.display();
     }
+
+    void saveGame(const std::string& filename) {
+        std::ofstream file(filename, std::ios::binary);
+        if (!file) {
+            std::cerr << "Failed to open file for saving." << std::endl;
+            return;
+        }
+
+        file.write(reinterpret_cast<const char*>(&elapsedTime), sizeof(elapsedTime));
+        file.write(reinterpret_cast<const char*>(&flagCount), sizeof(flagCount));
+        int diff = static_cast<int>(difficulty);
+        file.write(reinterpret_cast<const char*>(&diff), sizeof(diff));
+
+        board->serialize(file);
+        file.close();
+    }
+
+    void loadGame(const std::string& filename) {
+        std::ifstream file(filename, std::ios::binary);
+        if (!file) {
+            std::cerr << "No save file found, starting a new game" << std::endl;
+            return;
+        }
+
+        file.read(reinterpret_cast<char*>(&elapsedTime), sizeof(elapsedTime));
+        file.read(reinterpret_cast<char*>(&flagCount), sizeof(flagCount));
+        int diff;
+        file.read(reinterpret_cast<char*>(&diff), sizeof(diff));
+        difficulty = static_cast<Difficulty>(diff);
+        game_over = false;
+
+        int width, height, mines;
+        bool first_click;
+        file.read(reinterpret_cast<char*>(&width), sizeof(width));
+        file.read(reinterpret_cast<char*>(&height), sizeof(height));
+        file.read(reinterpret_cast<char*>(&mines), sizeof(mines));
+        file.read(reinterpret_cast<char*>(&first_click), sizeof(first_click));
+
+        if (board) delete board;
+        board = new Board(width, height, mines);
+        board->deserialize(file);
+        file.close();
+
+        isLoaded = true;
+    }
+
+
 };
 
 Menu::Menu(Game *game) : game(game), currentDifficulty(Difficulty::Easy) {
