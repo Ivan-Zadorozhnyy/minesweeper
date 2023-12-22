@@ -16,7 +16,7 @@ enum class Difficulty {
     Easy, Medium, Hard
 };
 
-enum class CellState: uint8_t{
+enum class CellState{
     Hidden, Revealed, Flagged
 };
 
